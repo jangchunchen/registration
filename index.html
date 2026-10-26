@@ -1,0 +1,1765 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Class Registration & Glass QR Pass — Apple Liquid Glass</title>
+  <!-- Load Tailwind CSS -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- Load QRCode.js for crisp, zero-CORS client-side QR Canvas generation -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+  <!-- Load Inter & JetBrains Mono fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@500;600;700&display=swap" rel="stylesheet">
+
+  <style>
+    :root {
+      --glass-bg: rgba(255, 255, 255, 0.14);
+      --glass-border: rgba(255, 255, 255, 0.35);
+      --glass-highlight: rgba(255, 255, 255, 0.58);
+      --input-bg: rgba(255, 255, 255, 0.10);
+      --input-focus-bg: rgba(255, 255, 255, 0.20);
+      --text-primary: #ffffff;
+      --text-secondary: rgba(255, 255, 255, 0.76);
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", "SF Pro Text", "Inter", sans-serif;
+      -webkit-font-smoothing: antialiased;
+      -moz-osx-font-smoothing: grayscale;
+    }
+
+    .font-mono-code {
+      font-family: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+    }
+
+    body {
+      min-height: 100vh;
+      background-color: #0b0c10;
+      color: var(--text-primary);
+      overflow-x: hidden;
+      position: relative;
+    }
+
+    /* ==========================================
+       Animated Fluid Mesh Background (4 Blobs)
+       ========================================== */
+    .mesh-background {
+      position: fixed;
+      inset: 0;
+      z-index: 0;
+      overflow: hidden;
+      background: radial-gradient(circle at 50% 35%, #161b30 0%, #0b0c10 100%);
+      pointer-events: none;
+    }
+
+    .blob {
+      position: absolute;
+      border-radius: 50%;
+      filter: blur(85px);
+      opacity: 0.74;
+      animation: floatMesh 18s infinite alternate ease-in-out;
+      will-change: transform;
+    }
+
+    .blob-1 {
+      width: 520px;
+      height: 520px;
+      background: linear-gradient(135deg, #ff2a85, #ff7b00);
+      top: -12%;
+      left: -8%;
+      animation-duration: 20s;
+    }
+
+    .blob-2 {
+      width: 580px;
+      height: 580px;
+      background: linear-gradient(135deg, #00d2ff, #3a7bd5);
+      bottom: -15%;
+      right: -8%;
+      animation-duration: 24s;
+      animation-delay: -5s;
+    }
+
+    .blob-3 {
+      width: 450px;
+      height: 450px;
+      background: linear-gradient(135deg, #7f00ff, #e100ff);
+      top: 32%;
+      left: 42%;
+      animation-duration: 16s;
+      animation-delay: -9s;
+    }
+
+    .blob-4 {
+      width: 380px;
+      height: 380px;
+      background: linear-gradient(135deg, #00f5a0, #00d9f5);
+      bottom: 10%;
+      left: 8%;
+      animation-duration: 22s;
+      animation-delay: -3s;
+    }
+
+    @keyframes floatMesh {
+      0% {
+        transform: translate(0, 0) scale(1) rotate(0deg);
+      }
+      50% {
+        transform: translate(65px, -45px) scale(1.12) rotate(14deg);
+      }
+      100% {
+        transform: translate(-50px, 55px) scale(0.93) rotate(-12deg);
+      }
+    }
+
+    /* Subtle noise texture overlay for authentic Apple glass grain */
+    .ambient-grid {
+      position: fixed;
+      inset: 0;
+      z-index: 0;
+      background-image: radial-gradient(rgba(255, 255, 255, 0.06) 1px, transparent 1px);
+      background-size: 28px 28px;
+      pointer-events: none;
+    }
+
+    /* ==========================================
+       Apple Liquid Glass Containers
+       ========================================== */
+    .glass-card {
+      background: var(--glass-bg);
+      backdrop-filter: blur(20px) saturate(180%);
+      -webkit-backdrop-filter: blur(20px) saturate(180%);
+      border: 1px solid var(--glass-border);
+      box-shadow:
+        0 28px 60px -12px rgba(0, 0, 0, 0.55),
+        inset 0 1px 1px 0 var(--glass-highlight),
+        inset 0 -1px 1px 0 rgba(255, 255, 255, 0.12);
+      transition: transform 0.35s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.35s ease, border-color 0.35s ease;
+    }
+
+    .glass-card:hover {
+      border-color: rgba(255, 255, 255, 0.44);
+      box-shadow:
+        0 34px 70px -12px rgba(0, 0, 0, 0.65),
+        inset 0 1px 1.5px 0 rgba(255, 255, 255, 0.72),
+        inset 0 -1px 1px 0 rgba(255, 255, 255, 0.16);
+    }
+
+    .glass-pill {
+      background: rgba(255, 255, 255, 0.15);
+      backdrop-filter: blur(20px) saturate(180%);
+      -webkit-backdrop-filter: blur(20px) saturate(180%);
+      border: 1px solid rgba(255, 255, 255, 0.35);
+      box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.45);
+    }
+
+    /* ==========================================
+       Liquid Glass Inputs & Select
+       ========================================== */
+    .input-field {
+      width: 100%;
+      padding: 13px 16px;
+      font-size: 0.96rem;
+      color: #ffffff;
+      background: var(--input-bg);
+      border: 1px solid rgba(255, 255, 255, 0.28);
+      border-radius: 14px;
+      outline: none;
+      backdrop-filter: blur(20px) saturate(160%);
+      -webkit-backdrop-filter: blur(20px) saturate(160%);
+      box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.18);
+      transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+
+    .input-field::placeholder {
+      color: rgba(255, 255, 255, 0.45);
+    }
+
+    .input-field:hover {
+      border-color: rgba(255, 255, 255, 0.45);
+      background: rgba(255, 255, 255, 0.14);
+    }
+
+    .input-field:focus {
+      background: var(--input-focus-bg);
+      border-color: rgba(255, 255, 255, 0.88);
+      box-shadow: 0 0 0 4px rgba(255, 255, 255, 0.14), inset 0 1px 1px rgba(255, 255, 255, 0.35);
+    }
+
+    .select-wrapper {
+      position: relative;
+    }
+
+    select.input-field {
+      appearance: none;
+      -webkit-appearance: none;
+      padding-right: 44px;
+      cursor: pointer;
+    }
+
+    select.input-field option {
+      background-color: #16192b;
+      color: #ffffff;
+      padding: 10px;
+    }
+
+    /* ==========================================
+       Glassmorphic Checkboxes
+       ========================================== */
+    .glass-checkbox {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      padding: 13px 16px;
+      border-radius: 16px;
+      background: rgba(255, 255, 255, 0.09);
+      border: 1px solid rgba(255, 255, 255, 0.26);
+      backdrop-filter: blur(20px) saturate(180%);
+      -webkit-backdrop-filter: blur(20px) saturate(180%);
+      cursor: pointer;
+      user-select: none;
+      transition: all 0.24s cubic-bezier(0.16, 1, 0.3, 1);
+      box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.25);
+    }
+
+    .glass-checkbox:hover {
+      background: rgba(255, 255, 255, 0.16);
+      border-color: rgba(255, 255, 255, 0.48);
+      transform: translateY(-1px);
+    }
+
+    .glass-checkbox.checked-card {
+      background: linear-gradient(135deg, rgba(0, 210, 255, 0.22) 0%, rgba(127, 0, 255, 0.18) 100%);
+      border-color: rgba(255, 255, 255, 0.72);
+      box-shadow:
+        0 8px 20px -6px rgba(0, 210, 255, 0.28),
+        inset 0 1px 1px rgba(255, 255, 255, 0.55);
+    }
+
+    .glass-checkbox input[type="checkbox"] {
+      appearance: none;
+      -webkit-appearance: none;
+      width: 22px;
+      height: 22px;
+      border-radius: 7px;
+      background: rgba(255, 255, 255, 0.14);
+      border: 1px solid rgba(255, 255, 255, 0.52);
+      display: grid;
+      place-content: center;
+      cursor: pointer;
+      flex-shrink: 0;
+      transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+
+    .glass-checkbox input[type="checkbox"]::before {
+      content: "";
+      width: 11px;
+      height: 11px;
+      transform: scale(0);
+      transition: transform 0.18s cubic-bezier(0.16, 1, 0.3, 1);
+      box-shadow: inset 1em 1em #ffffff;
+      clip-path: polygon(14% 44%, 0 65%, 50% 100%, 100% 16%, 80% 0%, 43% 62%);
+    }
+
+    .glass-checkbox input[type="checkbox"]:checked {
+      background: linear-gradient(135deg, #00d2ff 0%, #3a7bd5 100%);
+      border-color: #ffffff;
+      box-shadow: 0 0 14px rgba(0, 210, 255, 0.65);
+    }
+
+    .glass-checkbox input[type="checkbox"]:checked::before {
+      transform: scale(1);
+    }
+
+    /* ==========================================
+       Sleek Liquid Glass Buttons
+       ========================================== */
+    .submit-btn {
+      width: 100%;
+      padding: 15px 24px;
+      font-size: 1rem;
+      font-weight: 600;
+      letter-spacing: 0.01em;
+      color: #ffffff;
+      background: linear-gradient(
+        135deg,
+        rgba(255, 255, 255, 0.34) 0%,
+        rgba(255, 255, 255, 0.14) 100%
+      );
+      border: 1px solid rgba(255, 255, 255, 0.48);
+      border-radius: 16px;
+      cursor: pointer;
+      position: relative;
+      overflow: hidden;
+      backdrop-filter: blur(20px) saturate(180%);
+      -webkit-backdrop-filter: blur(20px) saturate(180%);
+      box-shadow:
+        0 12px 28px -6px rgba(0, 0, 0, 0.38),
+        inset 0 1px 1px rgba(255, 255, 255, 0.68);
+      transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 10px;
+    }
+
+    .submit-btn::before {
+      content: "";
+      position: absolute;
+      top: 0;
+      left: -100%;
+      width: 100%;
+      height: 100%;
+      background: linear-gradient(
+        90deg,
+        transparent,
+        rgba(255, 255, 255, 0.38),
+        transparent
+      );
+      transition: left 0.6s ease;
+    }
+
+    .submit-btn:hover:not(:disabled) {
+      transform: translateY(-2px) scale(1.01);
+      background: linear-gradient(
+        135deg,
+        rgba(255, 255, 255, 0.44) 0%,
+        rgba(255, 255, 255, 0.22) 100%
+      );
+      border-color: rgba(255, 255, 255, 0.85);
+      box-shadow:
+        0 16px 34px -5px rgba(0, 170, 255, 0.38),
+        inset 0 1px 2px rgba(255, 255, 255, 0.9);
+    }
+
+    .submit-btn:hover:not(:disabled)::before {
+      left: 100%;
+    }
+
+    .submit-btn:active:not(:disabled) {
+      transform: translateY(0) scale(0.99);
+    }
+
+    .submit-btn:disabled {
+      opacity: 0.65;
+      cursor: not-allowed;
+    }
+
+    /* Loading Spinner */
+    .spinner {
+      width: 19px;
+      height: 19px;
+      border: 2.2px solid rgba(255, 255, 255, 0.32);
+      border-top-color: #ffffff;
+      border-radius: 50%;
+      animation: spin 0.75s linear infinite;
+      display: none;
+    }
+
+    @keyframes spin {
+      to {
+        transform: rotate(360deg);
+      }
+    }
+
+    /* Title Gradient */
+    .apple-title {
+      background: linear-gradient(180deg, #ffffff 0%, rgba(255, 255, 255, 0.78) 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+
+    /* ==========================================
+       Apple Wallet Inspired Glass Ticket Styles
+       ========================================== */
+    .ticket-glass-shell {
+      position: relative;
+      background: linear-gradient(160deg, rgba(255, 255, 255, 0.20) 0%, rgba(255, 255, 255, 0.08) 100%);
+      backdrop-filter: blur(26px) saturate(190%);
+      -webkit-backdrop-filter: blur(26px) saturate(190%);
+      border: 1px solid rgba(255, 255, 255, 0.42);
+      box-shadow:
+        0 35px 80px -15px rgba(0, 0, 0, 0.7),
+        inset 0 1.5px 1px 0 rgba(255, 255, 255, 0.7),
+        inset 0 -1px 1px 0 rgba(255, 255, 255, 0.18);
+      overflow: hidden;
+    }
+
+    /* Iridescent holographic top bar on the ticket */
+    .ticket-holo-strip {
+      height: 6px;
+      width: 100%;
+      background: linear-gradient(90deg, #ff2a85, #ff7b00, #00f5a0, #00d2ff, #7f00ff);
+      background-size: 200% 100%;
+      animation: holoShift 6s linear infinite;
+    }
+
+    @keyframes holoShift {
+      0% { background-position: 0% 50%; }
+      100% { background-position: 200% 50%; }
+    }
+
+    /* Perforated Ticket Divider with Side Cutout Notches */
+    .ticket-divider {
+      position: relative;
+      height: 28px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      margin: 4px 0;
+    }
+
+    .ticket-divider::before,
+    .ticket-divider::after {
+      content: "";
+      position: absolute;
+      width: 24px;
+      height: 24px;
+      border-radius: 50%;
+      background-color: #0e111d;
+      border: 1px solid rgba(255, 255, 255, 0.35);
+      top: 50%;
+      transform: translateY(-50%);
+      z-index: 2;
+      box-shadow: inset 0 2px 6px rgba(0, 0, 0, 0.65);
+    }
+
+    .ticket-divider::before {
+      left: -37px;
+    }
+
+    .ticket-divider::after {
+      right: -37px;
+    }
+
+    .ticket-dashed-line {
+      width: 100%;
+      border-top: 1.5px dashed rgba(255, 255, 255, 0.32);
+    }
+
+    /* QR Code Container Styling */
+    #qrCodeContainer canvas,
+    #qrCodeContainer img {
+      margin: 0 auto;
+      border-radius: 10px;
+      display: block;
+    }
+
+    /* View Transition Animation */
+    .view-enter {
+      animation: cardPopIn 0.45s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+    }
+
+    @keyframes cardPopIn {
+      0% {
+        opacity: 0;
+        transform: translateY(16px) scale(0.97);
+      }
+      100% {
+        opacity: 1;
+        transform: translateY(0) scale(1);
+      }
+    }
+
+    /* Print Media Query for Clean PDF/Print Output */
+    @media print {
+      body {
+        background: #0b0c10 !important;
+        -webkit-print-color-adjust: exact !important;
+        print-color-adjust: exact !important;
+      }
+      .no-print {
+        display: none !important;
+      }
+      #ticketViewSection {
+        display: block !important;
+        box-shadow: none !important;
+      }
+    }
+
+    @keyframes spinOnce {
+      from { transform: rotate(0deg); }
+      to { transform: rotate(360deg); }
+    }
+
+    .spin-refresh {
+      animation: spinOnce 0.6s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+  </style>
+</head>
+<body class="flex flex-col items-center justify-center py-8 px-4 sm:px-6">
+
+  <!-- Animated Liquid Mesh Background (4 Glowing Blobs) -->
+  <div class="mesh-background" aria-hidden="true">
+    <div class="blob blob-1"></div>
+    <div class="blob blob-2"></div>
+    <div class="blob blob-3"></div>
+    <div class="blob blob-4"></div>
+  </div>
+  <div class="ambient-grid" aria-hidden="true"></div>
+
+  <!-- Main Content Wrapper -->
+  <div class="relative z-10 w-full max-w-lg">
+
+    <!-- Top Floating Bar: Live Status & Apps Script Endpoint Settings -->
+    <div class="flex flex-wrap items-center justify-between gap-2 mb-4 px-1 no-print">
+      <div class="glass-pill inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full text-xs font-medium tracking-wide text-white/90">
+        <span id="modeDot" class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
+        <span id="modeLabel">AI & Smart Workflow Cohort</span>
+      </div>
+
+      <div class="flex items-center gap-2">
+        <!-- Live Registered Student Counter Pill (doGet Integration) -->
+        <div
+          id="liveCounterBadge"
+          class="glass-pill inline-flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-semibold text-white/95 border border-cyan-300/40"
+          title="Live Registered Students (fetched via Google Apps Script doGet)"
+        >
+          <span id="counterStatusDot" class="w-2 h-2 rounded-full bg-cyan-400 animate-pulse"></span>
+          <span><strong id="studentCountValue" class="font-mono-code text-cyan-200">18</strong> Students Registered</span>
+          <button
+            type="button"
+            id="refreshCountBtn"
+            class="ml-0.5 p-0.5 rounded-full hover:bg-white/20 text-white/75 hover:text-white transition cursor-pointer"
+            title="Refresh live student count (doGet)"
+            aria-label="Refresh live student count"
+          >
+            <svg id="refreshCountIcon" class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path>
+            </svg>
+          </button>
+        </div>
+
+        <button
+          type="button"
+          id="toggleSettingsBtn"
+          class="glass-pill inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium text-white/85 hover:text-white hover:border-white/60 transition cursor-pointer"
+          title="Configure Google Apps Script Web App URL & Copy Code.gs"
+        >
+          <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"></path>
+            <path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path>
+          </svg>
+          <span>Webhook Setup</span>
+        </button>
+      </div>
+    </div>
+
+    <!-- Collapsible Google Apps Script Settings Drawer -->
+    <div id="settingsDrawer" class="glass-card rounded-2xl p-4 mb-4 hidden transition-all no-print">
+      <div class="flex items-center justify-between mb-2">
+        <span class="text-xs font-semibold uppercase tracking-wider text-cyan-300">Google Apps Script Endpoint (doGet + doPost)</span>
+        <span id="endpointBadge" class="text-[11px] px-2.5 py-0.5 rounded-full bg-amber-400/20 border border-amber-300/40 text-amber-200 font-medium">
+          Preview / Demo Mode Active
+        </span>
+      </div>
+      <p class="text-xs text-white/75 mb-3 leading-relaxed">
+        Paste your deployed Google Apps Script Web App <code class="text-white/95 bg-white/10 px-1.5 py-0.5 rounded">/exec</code> URL below to fetch live student counts via <code class="text-cyan-200">doGet(e)</code> and save registrations via <code class="text-cyan-200">doPost(e)</code>.
+      </p>
+      <div class="flex flex-col sm:flex-row gap-2 mb-3">
+        <input
+          type="url"
+          id="customScriptUrl"
+          class="input-field !py-2 !text-xs font-mono-code"
+          value="https://script.google.com/macros/s/YOUR_DEPLOYMENT_ID_HERE/exec"
+          placeholder="https://script.google.com/macros/s/.../exec"
+        />
+        <button
+          type="button"
+          id="saveUrlBtn"
+          class="px-4 py-2 rounded-xl text-xs font-semibold bg-white/20 hover:bg-white/30 border border-white/40 text-white shrink-0 transition cursor-pointer"
+        >
+          Apply & Sync doGet
+        </button>
+      </div>
+
+      <div class="flex flex-wrap items-center justify-between gap-2 pt-2 border-t border-white/15">
+        <label class="inline-flex items-center gap-2 text-xs text-white/80 cursor-pointer select-none">
+          <input type="checkbox" id="forceDemoToggle" checked class="rounded border-white/40 bg-white/10 text-cyan-400 focus:ring-0" />
+          <span>Simulate Live Mode in Preview (Auto-increments counter in localStorage)</span>
+        </label>
+
+        <button
+          type="button"
+          id="copyAppsScriptBtn"
+          class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[11px] font-semibold bg-cyan-500/20 hover:bg-cyan-500/35 border border-cyan-300/40 text-cyan-100 transition cursor-pointer"
+        >
+          <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"></path>
+          </svg>
+          <span id="copyAppsScriptText">Copy Complete Code.gs (doGet + doPost)</span>
+        </button>
+      </div>
+    </div>
+
+    <!-- ==========================================
+         VIEW 1: REGISTRATION FORM CARD
+         ========================================== -->
+    <main id="formViewSection" class="glass-card rounded-[28px] p-6 sm:p-9 view-enter">
+      <!-- Header -->
+      <div class="mb-6">
+        <div class="flex flex-wrap items-center justify-between gap-2 mb-1.5">
+          <h1 class="apple-title text-2xl sm:text-3xl font-bold tracking-tight">
+            Class Registration
+          </h1>
+          <!-- In-Card Live Student Counter Sync Status Pill -->
+          <div class="glass-pill inline-flex items-center gap-2 px-3 py-1 rounded-full text-xs font-medium text-cyan-100">
+            <span class="w-1.5 h-1.5 rounded-full bg-emerald-400"></span>
+            <span id="cardHeaderCountText">18 Enrolled</span>
+            <span class="text-white/40">•</span>
+            <span class="text-cyan-200 font-semibold">Instant QR Pass</span>
+          </div>
+        </div>
+        <p class="text-sm text-white/75 mt-1 leading-relaxed">
+          Reserve your seat, complete your readiness checklist, and receive a downloadable Apple Liquid Glass QR Class Ticket.
+        </p>
+      </div>
+
+      <!-- Registration Form -->
+      <form id="registrationForm" class="space-y-5" novalidate>
+        <!-- Full Name -->
+        <div>
+          <label for="name" class="block text-xs font-medium uppercase tracking-wider text-white/85 mb-2">
+            Full Name
+          </label>
+          <input
+            type="text"
+            id="name"
+            name="name"
+            class="input-field"
+            placeholder="e.g., Alex Rivera"
+            required
+            autocomplete="name"
+          />
+        </div>
+
+        <!-- Email Address -->
+        <div>
+          <label for="email" class="block text-xs font-medium uppercase tracking-wider text-white/85 mb-2">
+            Email Address
+          </label>
+          <input
+            type="email"
+            id="email"
+            name="email"
+            class="input-field"
+            placeholder="alex@example.com"
+            required
+            autocomplete="email"
+          />
+        </div>
+
+        <!-- Course Selection -->
+        <div>
+          <label for="course" class="block text-xs font-medium uppercase tracking-wider text-white/85 mb-2">
+            Course Selection
+          </label>
+          <div class="select-wrapper">
+            <select id="course" name="course" class="input-field" required>
+              <option value="" disabled selected>Select a class session...</option>
+              <option value="Gemini AI & Google Workspace Mastery">Gemini AI & Google Workspace Mastery</option>
+              <option value="Smart Travel Planning & Live Map Tracking">Smart Travel Planning & Live Map Tracking</option>
+              <option value="Mobile AI Productivity (iPhone & Android)">Mobile AI Productivity (iPhone & Android)</option>
+              <option value="Automated Workflows with Docs & Sheets">Automated Workflows with Docs & Sheets</option>
+            </select>
+            <!-- Custom SVG Chevron -->
+            <div class="pointer-events-none absolute inset-y-0 right-0 flex items-center pr-4 text-white/80">
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M19 9l-7 7-7-7"></path>
+              </svg>
+            </div>
+          </div>
+        </div>
+
+        <!-- 4 Required Glassmorphic Checkboxes -->
+        <div>
+          <div class="flex items-center justify-between mb-2.5">
+            <span class="block text-xs font-medium uppercase tracking-wider text-white/85">
+              Class Readiness & Focus Checklist
+            </span>
+            <button
+              type="button"
+              id="checkAllBtn"
+              class="text-xs text-cyan-300 hover:text-cyan-200 font-medium transition cursor-pointer"
+            >
+              Select All
+            </button>
+          </div>
+
+          <div class="space-y-2.5">
+            <!-- Checkbox 1: Install Gemini App -->
+            <label class="glass-checkbox" for="check1">
+              <div class="flex items-center gap-3">
+                <input type="checkbox" id="check1" name="installGemini" value="Install Gemini App" checked />
+                <div>
+                  <span class="block text-sm font-medium text-white">Install Gemini App</span>
+                  <span class="block text-xs text-white/60">Ready with voice & camera live prompts</span>
+                </div>
+              </div>
+              <span class="text-xs px-2.5 py-1 rounded-full bg-white/10 border border-white/20 text-white/80 shrink-0">
+                Step 1
+              </span>
+            </label>
+
+            <!-- Checkbox 2: Use Google gmail, Docs and Sheets -->
+            <label class="glass-checkbox" for="check2">
+              <div class="flex items-center gap-3">
+                <input type="checkbox" id="check2" name="useGoogleWorkspace" value="Use Google gmail, Docs and Sheets" checked />
+                <div>
+                  <span class="block text-sm font-medium text-white">Use Google gmail, Docs and Sheets</span>
+                  <span class="block text-xs text-white/60">Connect Workspace extensions & smart drafts</span>
+                </div>
+              </div>
+              <span class="text-xs px-2.5 py-1 rounded-full bg-white/10 border border-white/20 text-white/80 shrink-0">
+                Step 2
+              </span>
+            </label>
+
+            <!-- Checkbox 3: iPhone or Android -->
+            <label class="glass-checkbox" for="check3">
+              <div class="flex items-center gap-3">
+                <input type="checkbox" id="check3" name="mobilePlatform" value="iPhone or Android" checked />
+                <div>
+                  <span class="block text-sm font-medium text-white">iPhone or Android</span>
+                  <span class="block text-xs text-white/60">Bring your primary mobile device to class</span>
+                </div>
+              </div>
+              <span class="text-xs px-2.5 py-1 rounded-full bg-white/10 border border-white/20 text-white/80 shrink-0">
+                Device
+              </span>
+            </label>
+
+            <!-- Checkbox 4: Focus on travel task and map tracking -->
+            <label class="glass-checkbox" for="check4">
+              <div class="flex items-center gap-3">
+                <input type="checkbox" id="check4" name="focusTravelMap" value="Focus on travel task and map tracking" checked />
+                <div>
+                  <span class="block text-sm font-medium text-white">Focus on travel task and map tracking</span>
+                  <span class="block text-xs text-white/60">Itineraries, live pins & location workflows</span>
+                </div>
+              </div>
+              <span class="text-xs px-2.5 py-1 rounded-full bg-white/10 border border-white/20 text-white/80 shrink-0">
+                Focus
+              </span>
+            </label>
+          </div>
+        </div>
+
+        <!-- Submit Button -->
+        <div class="pt-1">
+          <button type="submit" id="submitBtn" class="submit-btn">
+            <svg class="w-5 h-5 text-cyan-300" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M15 5v2m0 4v2m0 4v2M5 5a2 2 0 00-2 2v3a2 2 0 110 4v3a2 2 0 002 2h14a2 2 0 002-2v-3a2 2 0 110-4V7a2 2 0 00-2-2H5z"></path>
+            </svg>
+            <span id="btnText">Complete Registration & Generate Pass</span>
+            <div id="btnSpinner" class="spinner"></div>
+          </button>
+        </div>
+
+        <!-- Validation / Error Alert Box -->
+        <div
+          id="statusMessage"
+          class="hidden rounded-2xl p-4 text-sm backdrop-blur-xl transition-all"
+          role="alert"
+        ></div>
+      </form>
+    </main>
+
+    <!-- ==========================================
+         VIEW 2: GLASSMORPHISM QR CLASS TICKET PASS
+         ========================================== -->
+    <section id="ticketViewSection" class="hidden view-enter">
+      <!-- Confirmation Banner -->
+      <div class="glass-pill rounded-2xl px-4 py-3 mb-4 flex items-center justify-between gap-3 border border-emerald-400/40 bg-emerald-500/15 no-print">
+        <div class="flex items-center gap-2.5">
+          <span class="w-6 h-6 rounded-full bg-emerald-400/25 border border-emerald-300/60 flex items-center justify-center text-emerald-300 shrink-0">
+            ✓
+          </span>
+          <div class="text-xs">
+            <p id="ticketSyncStatusTitle" class="font-semibold text-white">Registration Confirmed & Pass Issued</p>
+            <p id="ticketSyncStatusSub" class="text-white/75">Save your high-res PNG ticket below or scan the QR code at check-in.</p>
+          </div>
+        </div>
+        <span class="text-[11px] font-mono-code uppercase px-2.5 py-1 rounded-full bg-white/15 text-emerald-200 border border-white/25 shrink-0">
+          Verified
+        </span>
+      </div>
+
+      <!-- Apple Wallet Style Liquid Glass Pass -->
+      <div class="ticket-glass-shell rounded-[30px]">
+        <!-- Iridescent Top Accent Strip -->
+        <div class="ticket-holo-strip"></div>
+
+        <div class="p-6 sm:p-7">
+          <!-- Ticket Top Row: Brand & Ticket ID -->
+          <div class="flex items-start justify-between gap-3 mb-5">
+            <div>
+              <div class="inline-flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-widest text-cyan-300 mb-1">
+                <span class="w-2 h-2 rounded-full bg-cyan-400"></span>
+                <span>Apple Liquid Glass Studio Pass</span>
+              </div>
+              <h2 id="ticketCourseTitle" class="text-xl sm:text-2xl font-bold text-white leading-tight">
+                Gemini AI & Google Workspace Mastery
+              </h2>
+            </div>
+            <div class="text-right shrink-0">
+              <span class="block text-[10px] uppercase tracking-wider text-white/55">Ticket ID</span>
+              <span id="ticketIdDisplay" class="font-mono-code text-sm font-bold text-cyan-200 bg-white/10 px-2.5 py-1 rounded-lg border border-white/25 inline-block mt-0.5">
+                #GEM-2026-8492
+              </span>
+            </div>
+          </div>
+
+          <!-- Attendee & Session Metadata Grid -->
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 bg-white/10 border border-white/20 rounded-2xl p-4 mb-4">
+            <div>
+              <span class="block text-[10px] uppercase tracking-wider text-white/55">Attendee Name</span>
+              <p id="ticketNameDisplay" class="text-sm font-semibold text-white truncate mt-0.5">Alex Rivera</p>
+            </div>
+            <div>
+              <span class="block text-[10px] uppercase tracking-wider text-white/55">Registered Email</span>
+              <p id="ticketEmailDisplay" class="text-sm font-medium text-white/90 truncate mt-0.5">alex@example.com</p>
+            </div>
+            <div>
+              <span class="block text-[10px] uppercase tracking-wider text-white/55">Issued Timestamp</span>
+              <p id="ticketDateDisplay" class="text-xs font-medium text-white/85 mt-0.5">Oct 25, 2026 • 4:30 PM</p>
+            </div>
+            <div>
+              <span class="block text-[10px] uppercase tracking-wider text-white/55">Admission Tier</span>
+              <p class="text-xs font-semibold text-emerald-300 mt-0.5">VIP Interactive Studio Seat</p>
+            </div>
+          </div>
+
+          <!-- Readiness Checklist Badges -->
+          <div class="mb-2">
+            <span class="block text-[10px] uppercase tracking-wider text-white/60 mb-2">
+              Verified Class Readiness & Focus Modules
+            </span>
+            <div id="ticketChecklistBadges" class="flex flex-wrap gap-1.5">
+              <!-- Populated dynamically -->
+            </div>
+          </div>
+
+          <!-- Perforated Ticket Divider -->
+          <div class="ticket-divider" aria-hidden="true">
+            <div class="ticket-dashed-line"></div>
+          </div>
+
+          <!-- Bottom Stub: Scannable QR Code & Verification -->
+          <div class="pt-2 flex flex-col sm:flex-row items-center justify-between gap-5">
+            <!-- White Glass QR Pedestal for Immediate Scannability -->
+            <div class="bg-white p-3.5 rounded-2xl shadow-xl border border-white/80 shrink-0 flex flex-col items-center">
+              <div id="qrCodeContainer" class="w-[136px] h-[136px] flex items-center justify-center"></div>
+              <span id="qrCaptionCode" class="font-mono-code text-[10px] font-bold text-slate-700 mt-1.5 tracking-wider">
+                GEM-2026-8492
+              </span>
+            </div>
+
+            <!-- Pass Instructions & Live Status -->
+            <div class="flex-1 text-center sm:text-left space-y-2">
+              <div class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-cyan-400/15 border border-cyan-300/35 text-cyan-200 text-xs font-medium">
+                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" d="M12 4v1m6 11h2m-6 0h-2v4m0-11v3m0 0h.01M12 12h4.01M16 20h4M4 12h4m12 0h.01M5 8h2a1 1 0 001-1V5a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1zm12 0h2a1 1 0 001-1V5a1 1 0 00-1-1h-2a1 1 0 00-1 1v2a1 1 0 001 1zM5 20h2a1 1 0 001-1v-2a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1z"></path>
+                </svg>
+                <span>Scannable JSON Check-In QR</span>
+              </div>
+              <p class="text-xs text-white/80 leading-relaxed">
+                Scan this QR code with any phone camera to verify student registration, course track, and readiness checklist status.
+              </p>
+              <p class="text-[11px] text-white/55 font-mono-code">
+                STATUS: CONFIRMED • COHORT 2026
+              </p>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Ticket Action Buttons (Download High-Res PNG, Print/PDF, Reset) -->
+      <div class="mt-5 space-y-3 no-print">
+        <button
+          type="button"
+          id="downloadPngBtn"
+          class="submit-btn"
+        >
+          <svg class="w-5 h-5 text-cyan-300" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path>
+          </svg>
+          <span id="downloadBtnText">Download High-Res PNG Ticket</span>
+        </button>
+
+        <div class="grid grid-cols-2 gap-3">
+          <button
+            type="button"
+            id="printTicketBtn"
+            class="glass-pill py-3 px-4 rounded-2xl text-xs font-semibold text-white hover:bg-white/25 transition flex items-center justify-center gap-2 cursor-pointer"
+          >
+            <svg class="w-4 h-4 text-white/85" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z"></path>
+            </svg>
+            <span>Print / Save PDF</span>
+          </button>
+
+          <button
+            type="button"
+            id="registerAnotherBtn"
+            class="glass-pill py-3 px-4 rounded-2xl text-xs font-semibold text-white hover:bg-white/25 transition flex items-center justify-center gap-2 cursor-pointer"
+          >
+            <svg class="w-4 h-4 text-white/85" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4"></path>
+            </svg>
+            <span>Register Another Student</span>
+          </button>
+        </div>
+      </div>
+    </section>
+
+    <!-- Footer Caption -->
+    <p class="text-center text-xs text-white/50 mt-5 no-print">
+      Crafted with Apple Liquid Glass • <code class="text-white/70">backdrop-filter: blur(20px)</code>
+    </p>
+  </div>
+
+  <script>
+    // Default Google Apps Script Web App URL
+    let GOOGLE_SCRIPT_URL = "https://script.google.com/macros/s/YOUR_DEPLOYMENT_ID_HERE/exec";
+
+    // DOM Elements
+    const form = document.getElementById("registrationForm");
+    const submitBtn = document.getElementById("submitBtn");
+    const btnText = document.getElementById("btnText");
+    const btnSpinner = document.getElementById("btnSpinner");
+    const statusMessage = document.getElementById("statusMessage");
+
+    const formViewSection = document.getElementById("formViewSection");
+    const ticketViewSection = document.getElementById("ticketViewSection");
+
+    // Settings Drawer Controls
+    const toggleSettingsBtn = document.getElementById("toggleSettingsBtn");
+    const settingsDrawer = document.getElementById("settingsDrawer");
+    const customScriptUrlInput = document.getElementById("customScriptUrl");
+    const saveUrlBtn = document.getElementById("saveUrlBtn");
+    const endpointBadge = document.getElementById("endpointBadge");
+    const forceDemoToggle = document.getElementById("forceDemoToggle");
+
+    // Ticket DOM Elements
+    const ticketCourseTitle = document.getElementById("ticketCourseTitle");
+    const ticketIdDisplay = document.getElementById("ticketIdDisplay");
+    const ticketNameDisplay = document.getElementById("ticketNameDisplay");
+    const ticketEmailDisplay = document.getElementById("ticketEmailDisplay");
+    const ticketDateDisplay = document.getElementById("ticketDateDisplay");
+    const ticketChecklistBadges = document.getElementById("ticketChecklistBadges");
+    const qrCodeContainer = document.getElementById("qrCodeContainer");
+    const qrCaptionCode = document.getElementById("qrCaptionCode");
+    const ticketSyncStatusTitle = document.getElementById("ticketSyncStatusTitle");
+    const ticketSyncStatusSub = document.getElementById("ticketSyncStatusSub");
+
+    // Ticket Action Buttons
+    const downloadPngBtn = document.getElementById("downloadPngBtn");
+    const downloadBtnText = document.getElementById("downloadBtnText");
+    const printTicketBtn = document.getElementById("printTicketBtn");
+    const registerAnotherBtn = document.getElementById("registerAnotherBtn");
+
+    // Live Registered Counter Elements (doGet integration)
+    const studentCountValue = document.getElementById("studentCountValue");
+    const cardHeaderCountText = document.getElementById("cardHeaderCountText");
+    const refreshCountBtn = document.getElementById("refreshCountBtn");
+    const refreshCountIcon = document.getElementById("refreshCountIcon");
+    const counterStatusDot = document.getElementById("counterStatusDot");
+    const copyAppsScriptBtn = document.getElementById("copyAppsScriptBtn");
+    const copyAppsScriptText = document.getElementById("copyAppsScriptText");
+
+    // Store latest registration record for high-res Canvas PNG rendering
+    let currentTicketRecord = null;
+    let currentStudentCount = 18;
+
+    // Initialize Demo Counter from localStorage so registrations persist in preview
+    const STORAGE_COUNT_KEY = "liquid_glass_demo_student_count_v1";
+    const savedDemoCount = parseInt(localStorage.getItem(STORAGE_COUNT_KEY), 10);
+    if (!isNaN(savedDemoCount) && savedDemoCount >= 18) {
+      currentStudentCount = savedDemoCount;
+    } else {
+      localStorage.setItem(STORAGE_COUNT_KEY, String(currentStudentCount));
+    }
+
+    // Smoothly animate number changes in the counter badge
+    function animateCounterTo(targetCount) {
+      const startCount = parseInt(studentCountValue.textContent, 10) || 18;
+      const duration = 550;
+      const startTime = performance.now();
+
+      function tick(now) {
+        const progress = Math.min((now - startTime) / duration, 1);
+        const eased = 1 - Math.pow(1 - progress, 3);
+        const current = Math.round(startCount + (targetCount - startCount) * eased);
+        studentCountValue.textContent = String(current);
+        cardHeaderCountText.textContent = `${current} Enrolled`;
+        if (progress < 1) {
+          requestAnimationFrame(tick);
+        } else {
+          studentCountValue.textContent = String(targetCount);
+          cardHeaderCountText.textContent = `${targetCount} Enrolled`;
+        }
+      }
+      requestAnimationFrame(tick);
+    }
+
+    // ==========================================
+    // Fetch Live Registered Student Count via doGet(e)
+    // ==========================================
+    async function fetchLiveStudentCount() {
+      refreshCountIcon.classList.remove("spin-refresh");
+      void refreshCountIcon.offsetWidth; // trigger reflow
+      refreshCountIcon.classList.add("spin-refresh");
+
+      const activeUrl = customScriptUrlInput.value.trim() || GOOGLE_SCRIPT_URL;
+      const isPlaceholderUrl = !activeUrl || activeUrl.includes("YOUR_DEPLOYMENT_ID_HERE");
+
+      if (isPlaceholderUrl || forceDemoToggle.checked) {
+        // Simulated live doGet response using persistent localStorage counter
+        const stored = parseInt(localStorage.getItem(STORAGE_COUNT_KEY), 10);
+        currentStudentCount = !isNaN(stored) ? stored : 18;
+        counterStatusDot.className = "w-2 h-2 rounded-full bg-cyan-400 animate-pulse";
+        animateCounterTo(currentStudentCount);
+        return;
+      }
+
+      try {
+        counterStatusDot.className = "w-2 h-2 rounded-full bg-amber-300 animate-ping";
+        const response = await fetch(activeUrl, {
+          method: "GET",
+          redirect: "follow"
+        });
+
+        if (!response.ok) {
+          throw new Error(`HTTP ${response.status}`);
+        }
+
+        const result = await response.json();
+        if (typeof result.totalRegistrations === "number") {
+          currentStudentCount = result.totalRegistrations;
+          animateCounterTo(currentStudentCount);
+          counterStatusDot.className = "w-2 h-2 rounded-full bg-emerald-400 animate-pulse";
+        }
+      } catch (err) {
+        console.warn("doGet live count fetch fell back to local counter:", err);
+        counterStatusDot.className = "w-2 h-2 rounded-full bg-amber-400";
+        animateCounterTo(currentStudentCount);
+      }
+    }
+
+    refreshCountBtn.addEventListener("click", fetchLiveStudentCount);
+
+    // Trigger doGet automatically on page load
+    window.addEventListener("DOMContentLoaded", () => {
+      updateEndpointStatusBadge();
+      fetchLiveStudentCount();
+    });
+
+    // ==========================================
+    // Copy Complete Google Apps Script (doGet + doPost)
+    // ==========================================
+    const COMPLETE_APPS_SCRIPT_CODE = `function doGet(e) {
+  try {
+    const sheet = SpreadsheetApp.getActiveSpreadsheet().getActiveSheet();
+    const lastRow = sheet.getLastRow();
+    const params = (e && e.parameter) ? e.parameter : {};
+
+    if (params.ticketId && lastRow >= 2) {
+      const data = sheet.getDataRange().getValues();
+      for (let i = 1; i < data.length; i++) {
+        if (data[i].includes(params.ticketId)) {
+          return createJsonResponse({ status: "success", verified: true, ticketId: params.ticketId, name: data[i][2], course: data[i][4] });
+        }
+      }
+      return createJsonResponse({ status: "not_found", verified: false });
+    }
+
+    const totalRegistrations = Math.max(0, lastRow - 1);
+    return createJsonResponse({
+      status: "online",
+      totalRegistrations: totalRegistrations,
+      timestamp: new Date().toISOString()
+    });
+  } catch (err) {
+    return createJsonResponse({ status: "error", message: err.toString() });
+  }
+}
+
+function doPost(e) {
+  try {
+    const sheet = SpreadsheetApp.getActiveSpreadsheet().getActiveSheet();
+    if (sheet.getLastRow() === 0) {
+      sheet.appendRow(["Timestamp", "Ticket ID", "Full Name", "Email", "Course", "1. Install Gemini", "2. Workspace", "3. iPhone/Android", "4. Travel & Map"]);
+    }
+    const data = JSON.parse(e.postData.contents);
+    const ticketId = data.ticketId || ("GEM-2026-" + Math.floor(1000 + Math.random() * 9000));
+    sheet.appendRow([
+      new Date(),
+      ticketId,
+      data.name || "",
+      data.email || "",
+      data.course || "",
+      data.installGeminiApp ? "Yes" : "No",
+      data.useGoogleWorkspace ? "Yes" : "No",
+      data.iphoneOrAndroid ? "Yes" : "No",
+      data.focusTravelAndMap ? "Yes" : "No"
+    ]);
+    const totalRegistrations = Math.max(1, sheet.getLastRow() - 1);
+    return createJsonResponse({ status: "success", ticketId: ticketId, totalRegistrations: totalRegistrations });
+  } catch (err) {
+    return createJsonResponse({ status: "error", message: err.toString() });
+  }
+}
+
+function createJsonResponse(payload) {
+  return ContentService.createTextOutput(JSON.stringify(payload)).setMimeType(ContentService.MimeType.JSON);
+}`;
+
+    copyAppsScriptBtn.addEventListener("click", () => {
+      const tempArea = document.createElement("textarea");
+      tempArea.value = COMPLETE_APPS_SCRIPT_CODE;
+      document.body.appendChild(tempArea);
+      tempArea.select();
+      document.execCommand("copy");
+      document.body.removeChild(tempArea);
+
+      const prevLabel = copyAppsScriptText.textContent;
+      copyAppsScriptText.textContent = "Copied Code.gs to Clipboard!";
+      setTimeout(() => {
+        copyAppsScriptText.textContent = prevLabel;
+      }, 2000);
+    });
+
+    // ==========================================
+    // Checklist Interactive Highlight & Select All
+    // ==========================================
+    const checkboxes = document.querySelectorAll('.glass-checkbox input[type="checkbox"]');
+    const checkAllBtn = document.getElementById("checkAllBtn");
+
+    function syncCheckboxStyles() {
+      let allChecked = true;
+      checkboxes.forEach((box) => {
+        const card = box.closest(".glass-checkbox");
+        if (box.checked) {
+          card.classList.add("checked-card");
+        } else {
+          card.classList.remove("checked-card");
+          allChecked = false;
+        }
+      });
+      checkAllBtn.textContent = allChecked ? "Clear All" : "Select All";
+    }
+
+    checkboxes.forEach((box) => {
+      box.addEventListener("change", syncCheckboxStyles);
+    });
+    syncCheckboxStyles();
+
+    checkAllBtn.addEventListener("click", () => {
+      const shouldCheck = Array.from(checkboxes).some((b) => !b.checked);
+      checkboxes.forEach((box) => {
+        box.checked = shouldCheck;
+      });
+      syncCheckboxStyles();
+    });
+
+    // ==========================================
+    // Webhook Drawer & Endpoint Status
+    // ==========================================
+    toggleSettingsBtn.addEventListener("click", () => {
+      settingsDrawer.classList.toggle("hidden");
+    });
+
+    function updateEndpointStatusBadge() {
+      const url = customScriptUrlInput.value.trim();
+      const isPlaceholder = !url || url.includes("YOUR_DEPLOYMENT_ID_HERE");
+      if (isPlaceholder || forceDemoToggle.checked) {
+        endpointBadge.textContent = "Preview / Demo Mode Active";
+        endpointBadge.className =
+          "text-[11px] px-2.5 py-0.5 rounded-full bg-amber-400/20 border border-amber-300/40 text-amber-200 font-medium";
+      } else {
+        endpointBadge.textContent = "Live Google Apps Script Connected";
+        endpointBadge.className =
+          "text-[11px] px-2.5 py-0.5 rounded-full bg-emerald-400/20 border border-emerald-300/40 text-emerald-200 font-medium";
+      }
+    }
+
+    forceDemoToggle.addEventListener("change", () => {
+      updateEndpointStatusBadge();
+      fetchLiveStudentCount();
+    });
+
+    saveUrlBtn.addEventListener("click", () => {
+      GOOGLE_SCRIPT_URL = customScriptUrlInput.value.trim();
+      if (!GOOGLE_SCRIPT_URL.includes("YOUR_DEPLOYMENT_ID_HERE") && GOOGLE_SCRIPT_URL.startsWith("http")) {
+        forceDemoToggle.checked = false;
+      }
+      updateEndpointStatusBadge();
+      fetchLiveStudentCount();
+      saveUrlBtn.textContent = "Synced!";
+      setTimeout(() => {
+        saveUrlBtn.textContent = "Apply & Sync doGet";
+      }, 1400);
+    });
+
+    // ==========================================
+    // Helper: Generate Unique Ticket ID & Date
+    // ==========================================
+    function generateTicketId() {
+      const chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
+      let code = "";
+      for (let i = 0; i < 4; i++) {
+        code += chars.charAt(Math.floor(Math.random() * chars.length));
+      }
+      return `GEM-2026-${code}`;
+    }
+
+    function formatDisplayDate(isoString) {
+      const d = new Date(isoString);
+      return d.toLocaleDateString("en-US", {
+        month: "short",
+        day: "numeric",
+        year: "numeric"
+      }) + " • " + d.toLocaleTimeString("en-US", {
+        hour: "numeric",
+        minute: "2-digit"
+      });
+    }
+
+    function showFormError(title, message) {
+      statusMessage.classList.remove("hidden");
+      statusMessage.className =
+        "rounded-2xl p-4 text-sm backdrop-blur-xl bg-rose-500/25 border border-rose-400/50 text-rose-100";
+      statusMessage.innerHTML = `
+        <div class="font-semibold text-white mb-0.5">${title}</div>
+        <div class="text-xs text-white/85 leading-relaxed">${message}</div>
+      `;
+    }
+
+    // ==========================================
+    // Populate & Display Glass QR Class Ticket
+    // ==========================================
+    function renderGlassTicket(record, syncModeText) {
+      currentTicketRecord = record;
+
+      ticketCourseTitle.textContent = record.course;
+      ticketIdDisplay.textContent = `#${record.ticketId}`;
+      qrCaptionCode.textContent = record.ticketId;
+      ticketNameDisplay.textContent = record.name;
+      ticketEmailDisplay.textContent = record.email;
+      ticketDateDisplay.textContent = record.formattedDate;
+
+      ticketSyncStatusTitle.textContent = syncModeText.title;
+      ticketSyncStatusSub.textContent = syncModeText.subtitle;
+
+      // Render Checklist Readiness Badges
+      ticketChecklistBadges.innerHTML = "";
+      const checklistMeta = [
+        { key: "installGeminiApp", label: "Install Gemini App" },
+        { key: "useGoogleWorkspace", label: "Use Google Gmail, Docs & Sheets" },
+        { key: "iphoneOrAndroid", label: "iPhone or Android" },
+        { key: "focusTravelAndMap", label: "Travel Task & Map Tracking" }
+      ];
+
+      checklistMeta.forEach((item) => {
+        const isChecked = Boolean(record[item.key]);
+        const badge = document.createElement("span");
+        if (isChecked) {
+          badge.className =
+            "inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium bg-emerald-400/20 border border-emerald-300/45 text-emerald-100";
+          badge.innerHTML = `<span class="text-emerald-300 font-bold">✓</span><span>${item.label}</span>`;
+        } else {
+          badge.className =
+            "inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium bg-white/5 border border-white/15 text-white/45";
+          badge.innerHTML = `<span>○</span><span>${item.label}</span>`;
+        }
+        ticketChecklistBadges.appendChild(badge);
+      });
+
+      // Generate Scannable QR Code inside #qrCodeContainer
+      qrCodeContainer.innerHTML = "";
+      const activeUrl = customScriptUrlInput.value.trim() || GOOGLE_SCRIPT_URL;
+      const isLiveUrl = activeUrl && !activeUrl.includes("YOUR_DEPLOYMENT_ID_HERE") && activeUrl.startsWith("http");
+
+      // If connected to a live Google Apps Script URL, encode the live doGet verification URL; otherwise encode compact JSON
+      const qrDataPayload = isLiveUrl
+        ? `${activeUrl}?ticketId=${encodeURIComponent(record.ticketId)}`
+        : JSON.stringify({
+            id: record.ticketId,
+            name: record.name,
+            email: record.email,
+            course: record.course,
+            ready: [
+              record.installGeminiApp ? "GeminiApp" : null,
+              record.useGoogleWorkspace ? "Workspace" : null,
+              record.iphoneOrAndroid ? "Mobile" : null,
+              record.focusTravelAndMap ? "TravelMap" : null
+            ].filter(Boolean)
+          });
+
+      if (typeof QRCode !== "undefined") {
+        new QRCode(qrCodeContainer, {
+          text: qrDataPayload,
+          width: 136,
+          height: 136,
+          colorDark: "#0b0c10",
+          colorLight: "#ffffff",
+          correctLevel: QRCode.CorrectLevel.M
+        });
+      }
+
+      // Transition from Form View to Glass Ticket View
+      formViewSection.classList.add("hidden");
+      ticketViewSection.classList.remove("hidden");
+      window.scrollTo({ top: 0, behavior: "smooth" });
+    }
+
+    // ==========================================
+    // High-DPI 2x Canvas Glass Ticket PNG Exporter
+    // ==========================================
+    function drawRoundedRect(ctx, x, y, width, height, radius) {
+      ctx.beginPath();
+      ctx.moveTo(x + radius, y);
+      ctx.lineTo(x + width - radius, y);
+      ctx.quadraticCurveTo(x + width, y, x + width, y + radius);
+      ctx.lineTo(x + width, y + height - radius);
+      ctx.quadraticCurveTo(x + width, y + height, x + width - radius, y + height);
+      ctx.lineTo(x + radius, y + height);
+      ctx.quadraticCurveTo(x, y + height, x, y + height - radius);
+      ctx.lineTo(x, y + radius);
+      ctx.quadraticCurveTo(x, y, x + radius, y);
+      ctx.closePath();
+    }
+
+    function wrapCanvasText(ctx, text, x, y, maxWidth, lineHeight) {
+      const words = text.split(" ");
+      let line = "";
+      let currentY = y;
+      for (let n = 0; n < words.length; n++) {
+        const testLine = line + words[n] + " ";
+        const metrics = ctx.measureText(testLine);
+        if (metrics.width > maxWidth && n > 0) {
+          ctx.fillText(line.trim(), x, currentY);
+          line = words[n] + " ";
+          currentY += lineHeight;
+        } else {
+          line = testLine;
+        }
+      }
+      ctx.fillText(line.trim(), x, currentY);
+      return currentY;
+    }
+
+    async function downloadHighResTicketPng() {
+      if (!currentTicketRecord) return;
+
+      const originalText = downloadBtnText.textContent;
+      downloadBtnText.textContent = "Rendering High-DPI Glass Ticket...";
+
+      try {
+        const canvas = document.createElement("canvas");
+        const width = 1080;
+        const height = 1380;
+        canvas.width = width;
+        canvas.height = height;
+        const ctx = canvas.getContext("2d");
+
+        // 1. Deep Space Base Backdrop (#0b0c10)
+        ctx.fillStyle = "#0b0c10";
+        ctx.fillRect(0, 0, width, height);
+
+        // 2. Vibrant Liquid Mesh Gradient Orbs
+        const blobs = [
+          { x: 180, y: 200, r: 420, c1: "rgba(255, 42, 133, 0.55)", c2: "rgba(255, 123, 0, 0)" },
+          { x: 920, y: 1150, r: 480, c1: "rgba(0, 210, 255, 0.55)", c2: "rgba(58, 123, 213, 0)" },
+          { x: 640, y: 560, r: 400, c1: "rgba(127, 0, 255, 0.45)", c2: "rgba(225, 0, 255, 0)" },
+          { x: 220, y: 1080, r: 360, c1: "rgba(0, 245, 160, 0.40)", c2: "rgba(0, 217, 245, 0)" }
+        ];
+
+        blobs.forEach((b) => {
+          const grad = ctx.createRadialGradient(b.x, b.y, 10, b.x, b.y, b.r);
+          grad.addColorStop(0, b.c1);
+          grad.addColorStop(1, b.c2);
+          ctx.fillStyle = grad;
+          ctx.beginPath();
+          ctx.arc(b.x, b.y, b.r, 0, Math.PI * 2);
+          ctx.fill();
+        });
+
+        // 3. Outer Glassmorphism Ticket Card Frame
+        const cardX = 70;
+        const cardY = 80;
+        const cardW = width - 140;
+        const cardH = height - 160;
+
+        ctx.save();
+        drawRoundedRect(ctx, cardX, cardY, cardW, cardH, 48);
+        const glassGrad = ctx.createLinearGradient(cardX, cardY, cardX + cardW, cardY + cardH);
+        glassGrad.addColorStop(0, "rgba(255, 255, 255, 0.22)");
+        glassGrad.addColorStop(1, "rgba(255, 255, 255, 0.09)");
+        ctx.fillStyle = glassGrad;
+        ctx.fill();
+
+        // Top Holographic Accent Bar
+        ctx.clip();
+        const holoGrad = ctx.createLinearGradient(cardX, cardY, cardX + cardW, cardY);
+        holoGrad.addColorStop(0, "#ff2a85");
+        holoGrad.addColorStop(0.25, "#ff7b00");
+        holoGrad.addColorStop(0.5, "#00f5a0");
+        holoGrad.addColorStop(0.75, "#00d2ff");
+        holoGrad.addColorStop(1, "#7f00ff");
+        ctx.fillStyle = holoGrad;
+        ctx.fillRect(cardX, cardY, cardW, 14);
+        ctx.restore();
+
+        // Fine 1px Glass Specular Border
+        drawRoundedRect(ctx, cardX, cardY, cardW, cardH, 48);
+        ctx.lineWidth = 2.5;
+        ctx.strokeStyle = "rgba(255, 255, 255, 0.42)";
+        ctx.stroke();
+
+        // 4. Header Badge & Ticket ID Pill
+        const padX = cardX + 64;
+        let cursorY = cardY + 86;
+
+        ctx.fillStyle = "#67e8f9";
+        ctx.font = "700 20px Inter, -apple-system, sans-serif";
+        ctx.fillText("● APPLE LIQUID GLASS STUDIO PASS", padX, cursorY);
+
+        // Ticket ID Box (Top Right)
+        const idText = `#${currentTicketRecord.ticketId}`;
+        ctx.font = "700 24px 'JetBrains Mono', monospace";
+        const idWidth = ctx.measureText(idText).width + 44;
+        const idBoxX = cardX + cardW - 64 - idWidth;
+        const idBoxY = cursorY - 34;
+
+        drawRoundedRect(ctx, idBoxX, idBoxY, idWidth, 50, 16);
+        ctx.fillStyle = "rgba(255, 255, 255, 0.14)";
+        ctx.fill();
+        ctx.lineWidth = 1.5;
+        ctx.strokeStyle = "rgba(255, 255, 255, 0.38)";
+        ctx.stroke();
+
+        ctx.fillStyle = "#a5f3fc";
+        ctx.fillText(idText, idBoxX + 22, idBoxY + 33);
+
+        // 5. Course Title
+        cursorY += 56;
+        ctx.fillStyle = "#ffffff";
+        ctx.font = "800 44px Inter, -apple-system, sans-serif";
+        cursorY = wrapCanvasText(
+          ctx,
+          currentTicketRecord.course,
+          padX,
+          cursorY,
+          cardW - 128,
+          54
+        );
+
+        // 6. Attendee Metadata Glass Box
+        cursorY += 42;
+        const infoBoxH = 220;
+        drawRoundedRect(ctx, padX, cursorY, cardW - 128, infoBoxH, 28);
+        ctx.fillStyle = "rgba(255, 255, 255, 0.10)";
+        ctx.fill();
+        ctx.strokeStyle = "rgba(255, 255, 255, 0.24)";
+        ctx.lineWidth = 1.5;
+        ctx.stroke();
+
+        const col1X = padX + 36;
+        const col2X = padX + (cardW - 128) / 2 + 20;
+        let row1Y = cursorY + 52;
+
+        // Attendee Name
+        ctx.fillStyle = "rgba(255, 255, 255, 0.55)";
+        ctx.font = "600 18px Inter, sans-serif";
+        ctx.fillText("ATTENDEE NAME", col1X, row1Y);
+        ctx.fillStyle = "#ffffff";
+        ctx.font = "700 28px Inter, sans-serif";
+        ctx.fillText(currentTicketRecord.name.slice(0, 26), col1X, row1Y + 36);
+
+        // Email Address
+        ctx.fillStyle = "rgba(255, 255, 255, 0.55)";
+        ctx.font = "600 18px Inter, sans-serif";
+        ctx.fillText("REGISTERED EMAIL", col2X, row1Y);
+        ctx.fillStyle = "#ffffff";
+        ctx.font = "600 24px Inter, sans-serif";
+        ctx.fillText(currentTicketRecord.email.slice(0, 30), col2X, row1Y + 35);
+
+        // Issued Timestamp & Seat Status
+        let row2Y = row1Y + 92;
+        ctx.fillStyle = "rgba(255, 255, 255, 0.55)";
+        ctx.font = "600 18px Inter, sans-serif";
+        ctx.fillText("ISSUED TIMESTAMP", col1X, row2Y);
+        ctx.fillStyle = "rgba(255, 255, 255, 0.92)";
+        ctx.font = "600 22px Inter, sans-serif";
+        ctx.fillText(currentTicketRecord.formattedDate, col1X, row2Y + 32);
+
+        ctx.fillStyle = "rgba(255, 255, 255, 0.55)";
+        ctx.font = "600 18px Inter, sans-serif";
+        ctx.fillText("ADMISSION TIER", col2X, row2Y);
+        ctx.fillStyle = "#6ee7b7";
+        ctx.font = "700 22px Inter, sans-serif";
+        ctx.fillText("VIP Interactive Studio Seat", col2X, row2Y + 32);
+
+        // 7. Readiness Checklist Section
+        cursorY += infoBoxH + 52;
+        ctx.fillStyle = "rgba(255, 255, 255, 0.65)";
+        ctx.font = "600 19px Inter, sans-serif";
+        ctx.fillText("VERIFIED CLASS READINESS & FOCUS CHECKLIST", padX, cursorY);
+
+        cursorY += 24;
+        const checklistItems = [
+          { checked: currentTicketRecord.installGeminiApp, text: "Install Gemini App" },
+          { checked: currentTicketRecord.useGoogleWorkspace, text: "Use Google Gmail, Docs & Sheets" },
+          { checked: currentTicketRecord.iphoneOrAndroid, text: "iPhone or Android" },
+          { checked: currentTicketRecord.focusTravelAndMap, text: "Focus on Travel & Map Tracking" }
+        ];
+
+        const pillW = (cardW - 128 - 24) / 2;
+        const pillH = 58;
+        checklistItems.forEach((item, idx) => {
+          const col = idx % 2;
+          const row = Math.floor(idx / 2);
+          const px = padX + col * (pillW + 24);
+          const py = cursorY + row * (pillH + 18);
+
+          drawRoundedRect(ctx, px, py, pillW, pillH, 18);
+          if (item.checked) {
+            ctx.fillStyle = "rgba(16, 185, 129, 0.22)";
+            ctx.fill();
+            ctx.strokeStyle = "rgba(110, 231, 183, 0.55)";
+          } else {
+            ctx.fillStyle = "rgba(255, 255, 255, 0.06)";
+            ctx.fill();
+            ctx.strokeStyle = "rgba(255, 255, 255, 0.18)";
+          }
+          ctx.lineWidth = 1.5;
+          ctx.stroke();
+
+          ctx.font = "700 21px Inter, sans-serif";
+          ctx.fillStyle = item.checked ? "#6ee7b7" : "rgba(255, 255, 255, 0.4)";
+          ctx.fillText(item.checked ? "✓" : "○", px + 22, py + 37);
+
+          ctx.font = "600 20px Inter, sans-serif";
+          ctx.fillStyle = item.checked ? "#ecfdf5" : "rgba(255, 255, 255, 0.45)";
+          ctx.fillText(item.text, px + 52, py + 36);
+        });
+
+        // 8. Perforated Ticket Divider Line & Side Cutouts
+        cursorY += pillH * 2 + 68;
+        ctx.save();
+        ctx.setLineDash([14, 12]);
+        ctx.strokeStyle = "rgba(255, 255, 255, 0.35)";
+        ctx.lineWidth = 2.5;
+        ctx.beginPath();
+        ctx.moveTo(cardX + 30, cursorY);
+        ctx.lineTo(cardX + cardW - 30, cursorY);
+        ctx.stroke();
+        ctx.restore();
+
+        // Left & Right Cutout Notches
+        [cardX, cardX + cardW].forEach((notchX) => {
+          ctx.beginPath();
+          ctx.arc(notchX, cursorY, 26, 0, Math.PI * 2);
+          ctx.fillStyle = "#0b0c10";
+          ctx.fill();
+          ctx.lineWidth = 2;
+          ctx.strokeStyle = "rgba(255, 255, 255, 0.38)";
+          ctx.stroke();
+        });
+
+        // 9. Bottom Stub: Draw QR Code from DOM Canvas/Image
+        cursorY += 46;
+        const qrBoxSize = 270;
+        drawRoundedRect(ctx, padX, cursorY, qrBoxSize, qrBoxSize, 28);
+        ctx.fillStyle = "#ffffff";
+        ctx.fill();
+
+        const qrSourceCanvas = qrCodeContainer.querySelector("canvas");
+        const qrSourceImg = qrCodeContainer.querySelector("img");
+        if (qrSourceCanvas) {
+          ctx.drawImage(qrSourceCanvas, padX + 22, cursorY + 18, qrBoxSize - 44, qrBoxSize - 54);
+        } else if (qrSourceImg && qrSourceImg.complete) {
+          ctx.drawImage(qrSourceImg, padX + 22, cursorY + 18, qrBoxSize - 44, qrBoxSize - 54);
+        }
+
+        ctx.fillStyle = "#1e293b";
+        ctx.font = "700 18px 'JetBrains Mono', monospace";
+        const codeCaptionWidth = ctx.measureText(currentTicketRecord.ticketId).width;
+        ctx.fillText(
+          currentTicketRecord.ticketId,
+          padX + (qrBoxSize - codeCaptionWidth) / 2,
+          cursorY + qrBoxSize - 14
+        );
+
+        // Right Side of QR Stub: Instructions
+        const stubTextX = padX + qrBoxSize + 44;
+        let stubTextY = cursorY + 58;
+
+        ctx.fillStyle = "#67e8f9";
+        ctx.font = "700 22px Inter, sans-serif";
+        ctx.fillText("SCANNABLE CHECK-IN PASS", stubTextX, stubTextY);
+
+        stubTextY += 42;
+        ctx.fillStyle = "rgba(255, 255, 255, 0.86)";
+        ctx.font = "500 23px Inter, sans-serif";
+        stubTextY = wrapCanvasText(
+          ctx,
+          "Present this Apple Liquid Glass pass at the studio entrance. The QR code encodes your verified registration and checklist profile.",
+          stubTextX,
+          stubTextY,
+          cardW - 128 - qrBoxSize - 44,
+          34
+        );
+
+        stubTextY += 54;
+        ctx.fillStyle = "rgba(255, 255, 255, 0.50)";
+        ctx.font = "600 19px 'JetBrains Mono', monospace";
+        ctx.fillText("STATUS: CONFIRMED • COHORT 2026", stubTextX, stubTextY);
+
+        // Trigger PNG File Download
+        const dataUrl = canvas.toDataURL("image/png");
+        const downloadLink = document.createElement("a");
+        downloadLink.href = dataUrl;
+        downloadLink.download = `Class-Ticket-${currentTicketRecord.ticketId}.png`;
+        document.body.appendChild(downloadLink);
+        downloadLink.click();
+        document.body.removeChild(downloadLink);
+
+        downloadBtnText.textContent = "Ticket Downloaded (.PNG)!";
+        setTimeout(() => {
+          downloadBtnText.textContent = originalText;
+        }, 2200);
+      } catch (err) {
+        console.error("Failed to generate PNG ticket:", err);
+        downloadBtnText.textContent = originalText;
+      }
+    }
+
+    downloadPngBtn.addEventListener("click", downloadHighResTicketPng);
+
+    printTicketBtn.addEventListener("click", () => {
+      window.print();
+    });
+
+    registerAnotherBtn.addEventListener("click", () => {
+      form.reset();
+      checkboxes.forEach((box) => (box.checked = true));
+      syncCheckboxStyles();
+      statusMessage.classList.add("hidden");
+      ticketViewSection.classList.add("hidden");
+      formViewSection.classList.remove("hidden");
+      window.scrollTo({ top: 0, behavior: "smooth" });
+    });
+
+    // ==========================================
+    // Form Submit Handler (AJAX Fetch + Pass Generator)
+    // ==========================================
+    form.addEventListener("submit", async (event) => {
+      event.preventDefault();
+
+      const nameVal = document.getElementById("name").value.trim();
+      const emailVal = document.getElementById("email").value.trim();
+      const courseVal = document.getElementById("course").value;
+
+      if (!nameVal || !emailVal || !courseVal) {
+        showFormError(
+          "Missing Required Fields",
+          "Please enter your full name, a valid email address, and choose a course session."
+        );
+        return;
+      }
+
+      // Enter loading state
+      statusMessage.classList.add("hidden");
+      submitBtn.disabled = true;
+      btnText.textContent = "Generating Your Liquid Glass Pass...";
+      btnSpinner.style.display = "block";
+
+      const nowIso = new Date().toISOString();
+      const ticketId = generateTicketId();
+
+      // Construct JSON payload for Google Apps Script
+      const payload = {
+        ticketId: ticketId,
+        name: nameVal,
+        email: emailVal,
+        course: courseVal,
+        installGeminiApp: document.getElementById("check1").checked,
+        useGoogleWorkspace: document.getElementById("check2").checked,
+        iphoneOrAndroid: document.getElementById("check3").checked,
+        focusTravelAndMap: document.getElementById("check4").checked,
+        timestamp: nowIso,
+        formattedDate: formatDisplayDate(nowIso)
+      };
+
+      const activeUrl = customScriptUrlInput.value.trim() || GOOGLE_SCRIPT_URL;
+      const isPlaceholderUrl = !activeUrl || activeUrl.includes("YOUR_DEPLOYMENT_ID_HERE");
+
+      try {
+        if (isPlaceholderUrl || forceDemoToggle.checked) {
+          // Smooth interactive preview transition & increment live student counter
+          await new Promise((resolve) => setTimeout(resolve, 650));
+          currentStudentCount += 1;
+          localStorage.setItem(STORAGE_COUNT_KEY, String(currentStudentCount));
+          animateCounterTo(currentStudentCount);
+
+          renderGlassTicket(payload, {
+            title: `Registration #${currentStudentCount} Confirmed & QR Pass Issued`,
+            subtitle: "Preview Mode: Click 'Download High-Res PNG Ticket' below to save your pass."
+          });
+        } else {
+          // Real AJAX fetch POST request to Google Apps Script Web App URL
+          // Using text/plain avoids CORS preflight (OPTIONS) blocks from Google Apps Script
+          const response = await fetch(activeUrl, {
+            method: "POST",
+            headers: {
+              "Content-Type": "text/plain;charset=utf-8"
+            },
+            body: JSON.stringify(payload)
+          });
+
+          if (!response.ok) {
+            throw new Error(`Server responded with status ${response.status}`);
+          }
+
+          const result = await response.json();
+
+          if (result.status === "success" || result.result === "success") {
+            if (typeof result.totalRegistrations === "number") {
+              currentStudentCount = result.totalRegistrations;
+              animateCounterTo(currentStudentCount);
+            } else {
+              fetchLiveStudentCount();
+            }
+
+            renderGlassTicket(payload, {
+              title: "Synced to Google Sheets & QR Pass Issued!",
+              subtitle: "Your seat is recorded in Google Sheets. Download your PNG pass below."
+            });
+          } else {
+            throw new Error(result.message || "Registration could not be verified.");
+          }
+        }
+      } catch (error) {
+        console.error("Submission error:", error);
+        showFormError(
+          "Unable to Reach Google Apps Script Server",
+          "Please verify your Web App URL is deployed with 'Who has access: Anyone', or enable 'Simulate Live Mode' in Webhook Setup."
+        );
+      } finally {
+        submitBtn.disabled = false;
+        btnText.textContent = "Complete Registration & Generate Pass";
+        btnSpinner.style.display = "none";
+      }
+    });
+  </script>
+</body>
+</html>
